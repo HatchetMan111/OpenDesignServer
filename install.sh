@@ -12,7 +12,7 @@
 set -Eeuo pipefail
 
 readonly APP_NAME="OpenDesign-OpenCode"
-readonly SCRIPT_VERSION="1.0.2"
+readonly SCRIPT_VERSION="1.0.3"
 readonly VM_NAME_DEFAULT="opendesign-opencode"
 readonly UBUNTU_BASE="https://cloud-images.ubuntu.com/releases/server/24.04/release"
 readonly UBUNTU_IMAGE="ubuntu-24.04-server-cloudimg-amd64.img"
@@ -374,7 +374,9 @@ write_files:
     content: |
       OD_API_TOKEN=${OD_API_TOKEN}
       PORT=${OPENDESIGN_PORT}
+      OD_PORT=${OPENDESIGN_PORT}
       HOST=0.0.0.0
+      OD_BIND_HOST=0.0.0.0
 
   - path: /usr/local/sbin/opencode-setup
     owner: root:root
@@ -626,6 +628,7 @@ write_files:
       # Nodes Default-Heap (~2 GB) mit "JavaScript heap out of memory".
       runuser -u opencode -- env HOME=/home/opencode NODE_OPTIONS=--max-old-space-size=6144 NEXT_TELEMETRY_DISABLED=1 PATH="/home/opencode/.opencode/bin:/usr/local/bin:/usr/bin:/bin" bash -lc 'cd /opt/open-design && pnpm install && pnpm --filter @open-design/daemon build && pnpm --filter @open-design/web build'
       test -f ${OPENDESIGN_DIR}/apps/daemon/dist/cli.js
+      test -d ${OPENDESIGN_DIR}/apps/web/out
 
       echo "[opendesign 4/6] Erstelle systemd-Unit + Helper ..."
       cat >/etc/systemd/system/opendesign.service <<'UNIT'
@@ -642,6 +645,9 @@ write_files:
       Environment=HOME=/home/opencode
       Environment=PATH=/home/opencode/.opencode/bin:/usr/local/bin:/usr/bin:/bin
       EnvironmentFile=/etc/opendesign/env
+      Environment=NODE_ENV=production
+      Environment=NODE_OPTIONS=--max-old-space-size=1024
+      Environment=OD_BIND_HOST=0.0.0.0
       ExecStart=/usr/local/bin/opendesign-start
       Restart=always
       RestartSec=5
@@ -654,13 +660,16 @@ write_files:
       cat >/usr/local/bin/opendesign-start <<'START'
       #!/usr/bin/env bash
       set -euo pipefail
-      # Env (OD_API_TOKEN/PORT/HOST/DAEMON_PORT) liefert die systemd-Unit per
+      # Produktions-Modus wie im offiziellen Docker-Image: Der Daemon serviert
+      # API + statischen Web-Build selbst auf OD_BIND_HOST:OD_PORT.
+      # KEIN "tools-dev run web" hier - das ist ein Dev-Server und bindet
+      # grundsaetzlich nur 127.0.0.1 (vom LAN nicht erreichbar).
+      # Env (OD_API_TOKEN/OD_PORT/...) liefert die systemd-Unit per
       # EnvironmentFile (wird von systemd als root gelesen). NICHT hier per
       # ". /etc/opendesign/env" nachladen - die Datei ist 0600 root:root und
       # das Script laeuft als User opencode (Permission denied -> Restart-Loop).
-      # Defaults greifen nur bei manuellem Start ohne systemd.
       cd /opt/open-design
-      exec pnpm tools-dev run web --daemon-port "\${DAEMON_PORT:-7457}" --web-port "\${PORT:-7456}"
+      exec node apps/daemon/dist/cli.js --no-open
       START
       chmod 0755 /usr/local/bin/opendesign-start
 

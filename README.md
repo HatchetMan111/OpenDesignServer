@@ -34,8 +34,10 @@ Ubuntu publishes official 24.04 LTS Cloud Images and SHA256 checksums: [https://
 OpenCode documents `opencode web --hostname 0.0.0.0`, port 4096, HTTP Basic Authentication and mDNS: [https://opencode.ai/docs/web/](https://opencode.ai/docs/web/)
 
 OpenDesign is installed natively (`git clone https://github.com/nexu-io/open-design.git`,
-`pnpm install`, daemon + web via `pnpm tools-dev run web`) so the daemon
-auto-detects the OpenCode CLI (`/home/opencode/.opencode/bin`) as its agent.
+`pnpm install`) and runs in production mode like the official Docker image
+(`node apps/daemon/dist/cli.js --no-open`): the daemon serves its API plus
+the built web UI itself on `0.0.0.0:7456`. It auto-detects the OpenCode CLI
+(`/home/opencode/.opencode/bin`) as its agent.
 
 ## One-line installation
 
