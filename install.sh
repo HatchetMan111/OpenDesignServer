@@ -12,7 +12,7 @@
 set -Eeuo pipefail
 
 readonly APP_NAME="OpenDesign-OpenCode"
-readonly SCRIPT_VERSION="1.0.0"
+readonly SCRIPT_VERSION="1.0.1"
 readonly VM_NAME_DEFAULT="opendesign-opencode"
 readonly UBUNTU_BASE="https://cloud-images.ubuntu.com/releases/server/24.04/release"
 readonly UBUNTU_IMAGE="ubuntu-24.04-server-cloudimg-amd64.img"
@@ -616,7 +616,9 @@ write_files:
       echo "[opendesign 3/6] pnpm install + build (als opencode) ..."
       # PATH enthaelt absichtlich /home/opencode/.opencode/bin, damit der
       # OpenDesign-Daemon die OpenCode-CLI automatisch als Agent erkennt.
-      runuser -u opencode -- env HOME=/home/opencode PATH="/home/opencode/.opencode/bin:/usr/local/bin:/usr/bin:/bin" bash -lc 'cd /opt/open-design && pnpm install && pnpm --filter @open-design/daemon build && pnpm --filter @open-design/web build'
+      # NODE_OPTIONS: der Next.js-Web-Build (TypeScript-Phase) sprengt sonst
+      # Nodes Default-Heap (~2 GB) mit "JavaScript heap out of memory".
+      runuser -u opencode -- env HOME=/home/opencode NODE_OPTIONS=--max-old-space-size=6144 NEXT_TELEMETRY_DISABLED=1 PATH="/home/opencode/.opencode/bin:/usr/local/bin:/usr/bin:/bin" bash -lc 'cd /opt/open-design && pnpm install && pnpm --filter @open-design/daemon build && pnpm --filter @open-design/web build'
       test -f ${OPENDESIGN_DIR}/apps/daemon/dist/cli.js
 
       echo "[opendesign 4/6] Erstelle systemd-Unit + Helper ..."
@@ -656,7 +658,7 @@ write_files:
       #!/usr/bin/env bash
       set -euo pipefail
       git -C /opt/open-design pull --ff-only
-      runuser -u opencode -- env HOME=/home/opencode bash -lc 'cd /opt/open-design && pnpm install && pnpm --filter @open-design/daemon build && pnpm --filter @open-design/web build'
+      runuser -u opencode -- env HOME=/home/opencode NODE_OPTIONS=--max-old-space-size=6144 NEXT_TELEMETRY_DISABLED=1 bash -lc 'cd /opt/open-design && pnpm install && pnpm --filter @open-design/daemon build && pnpm --filter @open-design/web build'
       systemctl restart opendesign.service
       UPDATE
       chmod 0755 /usr/local/bin/opendesign-update
