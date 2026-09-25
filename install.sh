@@ -12,7 +12,7 @@
 set -Eeuo pipefail
 
 readonly APP_NAME="OpenDesign-OpenCode"
-readonly SCRIPT_VERSION="1.0.1"
+readonly SCRIPT_VERSION="1.0.2"
 readonly VM_NAME_DEFAULT="opendesign-opencode"
 readonly UBUNTU_BASE="https://cloud-images.ubuntu.com/releases/server/24.04/release"
 readonly UBUNTU_IMAGE="ubuntu-24.04-server-cloudimg-amd64.img"
@@ -654,7 +654,11 @@ write_files:
       cat >/usr/local/bin/opendesign-start <<'START'
       #!/usr/bin/env bash
       set -euo pipefail
-      set -a; . /etc/opendesign/env; set +a
+      # Env (OD_API_TOKEN/PORT/HOST/DAEMON_PORT) liefert die systemd-Unit per
+      # EnvironmentFile (wird von systemd als root gelesen). NICHT hier per
+      # ". /etc/opendesign/env" nachladen - die Datei ist 0600 root:root und
+      # das Script laeuft als User opencode (Permission denied -> Restart-Loop).
+      # Defaults greifen nur bei manuellem Start ohne systemd.
       cd /opt/open-design
       exec pnpm tools-dev run web --daemon-port "\${DAEMON_PORT:-7457}" --web-port "\${PORT:-7456}"
       START

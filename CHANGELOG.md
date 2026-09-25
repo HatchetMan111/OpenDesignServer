@@ -1,5 +1,9 @@
 # Changelog
 
+## v1.0.2
+
+- Fix: `opendesign-start` lud `/etc/opendesign/env` (0600 root:root) zur Laufzeit als User `opencode` nach (Permission denied, Restart-Loop). Env kommt jetzt ausschliesslich aus der systemd-Unit per `EnvironmentFile` (wird von systemd als root gelesen).
+
 ## v1.0.1
 
 - Fix: Next.js-Web-Build lief in `JavaScript heap out of memory` (Nodes Default-Heap ~2 GB in der TypeScript-Phase). Build und `opendesign-update` nutzen jetzt `NODE_OPTIONS=--max-old-space-size=6144`.
