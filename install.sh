@@ -236,6 +236,12 @@ ga_has_marker_opendesign() {
     jq -se '.[0].exitcode == 0' >/dev/null 2>&1
 }
 
+# Liefert true, wenn opendesign-setup gerade in der VM läuft.
+ga_od_setup_running() {
+  qm guest exec "$VMID" --timeout 5 -- pgrep -f /usr/local/sbin/opendesign-setup 2>/dev/null |
+    jq -se '.[0].exitcode == 0' >/dev/null 2>&1
+}
+
 # --- Guest-Agent-Diagnose (funktioniert schon, bevor/falls SSH nie klappt) ---
 # Der QEMU Guest Agent laeuft schon vor jeglichem SSH-Zugriff (wir nutzen ihn
 # bereits in get_ip). Darueber koennen wir Diagnosebefehle in der VM
@@ -910,7 +916,7 @@ ssh_push_setup() {
 # Guest-Agent den Marker liefert UND SSH zufällig erreichbar ist. Ein
 # SSH-Fehlschlag führt NIEMALS zum Abbruch der Installation.
 wait_for_setup() {
-  local i ssh_tried=0 ci_status=""
+  local i ssh_tried=0 ci_status="" od_fail=""
 
   info "Warte bis opencode-setup + opendesign-setup in der VM abgeschlossen sind (bis zu 15 Min) ..."
   info "Prüfung läuft primär über den QEMU Guest-Agent - SSH ist nur optional."
@@ -952,7 +958,16 @@ wait_for_setup() {
       if guest_agent_ready; then
         ci_status="$(gexec_out 5 "cloud-init status 2>&1 || true")"
       fi
-      info "Warte auf opencode-setup ... (${i}/180)${ci_status:+ — cloud-init: ${ci_status}}"
+      info "Warte auf opencode/opendesign-setup ... (${i}/180)${ci_status:+ — cloud-init: ${ci_status}}"
+      # Fail-fast: opencode ist fertig, aber opendesign-setup ist deterministisch
+      # gescheitert (z.B. Build-OOM) und laeuft nicht mehr -> keine 15 Min. warten.
+      if ga_has_marker && ! ga_has_marker_opendesign && ! ga_od_setup_running; then
+        od_fail="$(gexec_out 10 "grep -c 'FEHLER in Zeile' /var/log/opendesign-setup.log 2>/dev/null || echo 0")"
+        if [[ "$od_fail" =~ ^[1-9][0-9]*$ ]]; then
+          warn "opendesign-setup ist fehlgeschlagen (siehe /var/log/opendesign-setup.log in der VM) - breche Wartezeit ab."
+          return 1
+        fi
+      fi
     fi
     sleep 5
   done
