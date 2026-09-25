@@ -1193,17 +1193,18 @@ print_result() {
 EOF
 }
 
-# Rein informativ: weist auf VMs mit dem Tag "opencode" aus frueheren
-# (evtl. fehlgeschlagenen) Laeufen hin. Wird NICHTS geloescht oder
-# automatisch angefasst - jeder Lauf legt bewusst eine frische VM an, damit
-# nie versehentlich eine noch benutzte Installation angetastet wird.
+# Rein informativ: listet VMs mit dem Tag "opencode" aus frueheren Laeufen auf.
+# Es wird GAR NICHTS geloescht, gestoppt oder veraendert - jeder Lauf legt
+# bewusst eine frische VM mit der naechsten freien ID an. Die
+# Aufraeum-Zeile ist ein rein optionaler Vorschlag fuer DICH.
 list_existing_opencode_vms() {
   local id name status found=0
   while read -r id name status; do
     [[ -n "$id" ]] || continue
     if qm config "$id" 2>/dev/null | grep -q '^tags:.*opencode'; then
-      warn "Vorhandene VM ${id} (${name}, Status: ${status}) traegt bereits den Tag 'opencode' - evtl. Rest eines frueheren Versuchs."
-      warn "  Aufraeumen falls nicht mehr gebraucht: qm stop ${id}; qm destroy ${id} --purge"
+      warn "HINWEIS (keine Aktion, es wird nichts geloescht): VM ${id} (${name}, Status: ${status}) traegt den Tag 'opencode' - evtl. eine fruehere Installation."
+      warn "  Diese VM wird NICHT angefasst. Es wird immer eine neue VM mit der naechsten freien ID erstellt."
+      warn "  Nur falls DU sie selbst nicht mehr brauchst, kannst DU sie manuell entfernen: qm stop ${id}; qm destroy ${id} --purge"
       found=1
     fi
   done < <(qm list 2>/dev/null | awk 'NR>1 {print $1, $2, $3}')
